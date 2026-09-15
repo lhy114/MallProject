@@ -2,10 +2,12 @@ package com.macro.mall.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.github.pagehelper.PageHelper;
 import com.macro.mall.bo.AdminUserDetails;
 import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.common.util.RequestUtil;
+import com.macro.mall.dao.UmsAdminPlusMapper;
 import com.macro.mall.dao.UmsAdminRoleRelationDao;
 import com.macro.mall.dto.UmsAdminParam;
 import com.macro.mall.dto.UpdateAdminPasswordParam;
@@ -17,6 +19,7 @@ import com.macro.mall.security.util.JwtTokenUtil;
 import com.macro.mall.security.util.SpringUtil;
 import com.macro.mall.service.UmsAdminCacheService;
 import com.macro.mall.service.UmsAdminService;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.BeanUtils;
@@ -41,6 +44,7 @@ import java.util.List;
  * 后台用户管理Service实现类
  * Created by macro on 2018/4/26.
  */
+@Slf4j
 @Service
 public class UmsAdminServiceImpl implements UmsAdminService {
     private static final Logger LOGGER = LoggerFactory.getLogger(UmsAdminServiceImpl.class);
@@ -56,6 +60,9 @@ public class UmsAdminServiceImpl implements UmsAdminService {
     private UmsAdminRoleRelationDao adminRoleRelationDao;
     @Autowired
     private UmsAdminLoginLogMapper loginLogMapper;
+    @Autowired
+    private UmsAdminPlusMapper umsAdminPlusMapper;
+
 
     @Override
     public UmsAdmin getAdminByUsername(String username) {
@@ -83,16 +90,26 @@ public class UmsAdminServiceImpl implements UmsAdminService {
         umsAdmin.setCreateTime(new Date());
         umsAdmin.setStatus(1);
         //查询是否有相同用户名的用户
-        UmsAdminExample example = new UmsAdminExample();
-        example.createCriteria().andUsernameEqualTo(umsAdmin.getUsername());
-        List<UmsAdmin> umsAdminList = adminMapper.selectByExample(example);
-        if (umsAdminList.size() > 0) {
+//        UmsAdminExample example = new UmsAdminExample();
+//        example.createCriteria().andUsernameEqualTo(umsAdmin.getUsername());
+//        List<UmsAdmin> umsAdminList = adminMapper.selectByExample(example);
+//        if (umsAdminList.size() > 0) {
+//            return null;
+//        }
+        Long count = umsAdminPlusMapper.selectCount(
+            Wrappers.lambdaQuery(UmsAdmin.class)
+                .eq(UmsAdmin::getUsername, umsAdmin.getUsername())
+        );
+        if (count > 0) {
+            log.info("出现了用户名相同的情况");
             return null;
         }
+
         //将密码进行加密操作
         String encodePassword = passwordEncoder.encode(umsAdmin.getPassword());
         umsAdmin.setPassword(encodePassword);
         adminMapper.insert(umsAdmin);
+        log.info("创建成功");
         return umsAdmin;
     }
 
