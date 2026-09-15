@@ -47,6 +47,7 @@ public class UmsAdminController {
     @RequestMapping(value = "/register", method = RequestMethod.POST)
     @ResponseBody
     public CommonResult<UmsAdmin> register(@Validated @RequestBody UmsAdminParam umsAdminParam) {
+        // @Validated注解的功能：确保你传递的UmsAdminParam这个参数要完整， 请查看UmsAdminParam的定义
         UmsAdmin umsAdmin = adminService.register(umsAdminParam);
         if (umsAdmin == null) {
             return CommonResult.failed();

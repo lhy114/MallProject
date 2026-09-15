@@ -13,7 +13,6 @@
         <module>mall-common</module>
         <module>mall-mbg</module>
         <module>mall-security</module>
-        <module>mall-demo</module>
         <module>mall-admin</module>
         <module>mall-search</module>
         <module>mall-portal</module>
@@ -203,6 +202,12 @@
                 <groupId>com.squareup.okhttp3</groupId>
                 <artifactId>okhttp-jvm</artifactId>
                 <version>${okhttp3.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.projectlombok</groupId>
+                <artifactId>lombok</artifactId>
+                <version>1.18.46</version>
             </dependency>
 
         </dependencies>
