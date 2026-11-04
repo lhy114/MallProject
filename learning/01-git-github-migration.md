@@ -167,3 +167,9 @@ git ls-remote origin refs/heads/feature/mybatis-plus-pilot
 推荐用户在 IDEA 中使用 Git → Push，确认目标是自己的 origin 与当前分支；若要求认证，通过 IDEA 的 GitHub 登录流程在本机完成。不要把令牌发到聊天中。
 若 IDEA 需要添加账号，在 Settings → Version Control → GitHub 中添加自己的账号，然后重试 Push。界面名称可能随 IDEA 版本不同。
 推送完成后告知 Codex，由 Codex 重新检查远程 SHA 和分支跟踪关系，并补记最终结果。
+
+### 上传成功验证
+
+用户在 IDEA 完成推送后，已通过 `git ls-remote origin refs/heads/feature/mybatis-plus-pilot` 验证远程提交为 `a5e69c3ce50ec496dbb02bff99ea2b60abd14b7b`，与当时本地 HEAD 一致，首次迁移完成。此前认证阻碍已由用户通过本机操作解决。
+
+随后按用户要求精简 README，注明维护者刘洪宇（lhy114）、上游 macrozheng/mall、二次开发性质及 Apache-2.0 许可证，保留原版权声明与 LICENSE。README 此次修改尚需另行提交并推送。
