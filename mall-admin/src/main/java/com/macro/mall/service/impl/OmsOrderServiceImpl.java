@@ -1,6 +1,8 @@
 package com.macro.mall.service.impl;
 
 import com.github.pagehelper.PageHelper;
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.dao.OmsOrderDao;
 import com.macro.mall.dao.OmsOrderOperateHistoryDao;
 import com.macro.mall.dto.*;
@@ -15,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -88,7 +91,11 @@ public class OmsOrderServiceImpl implements OmsOrderService {
 
     @Override
     public OmsOrderDetail detail(Long id) {
-        return orderDao.getDetail(id);
+        OmsOrderDetail orderDetail = orderDao.getDetail(id);
+        if (orderDetail == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return orderDetail;
     }
 
     @Override

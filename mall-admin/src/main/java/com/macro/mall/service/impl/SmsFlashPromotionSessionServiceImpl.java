@@ -1,5 +1,7 @@
 package com.macro.mall.service.impl;
 
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.dto.SmsFlashPromotionSessionDetail;
 import com.macro.mall.mapper.SmsFlashPromotionSessionMapper;
 import com.macro.mall.model.SmsFlashPromotionSession;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 限时购场次管理Service实现类
@@ -52,7 +55,11 @@ public class SmsFlashPromotionSessionServiceImpl implements SmsFlashPromotionSes
 
     @Override
     public SmsFlashPromotionSession getItem(Long id) {
-        return promotionSessionMapper.selectByPrimaryKey(id);
+        SmsFlashPromotionSession promotionSession = promotionSessionMapper.selectByPrimaryKey(id);
+        if (promotionSession == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return promotionSession;
     }
 
     @Override

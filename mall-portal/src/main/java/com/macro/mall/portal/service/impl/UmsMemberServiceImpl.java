@@ -103,7 +103,7 @@ public class UmsMemberServiceImpl implements UmsMemberService {
             umsMember.setMemberLevelId(memberLevelList.get(0).getId());
         }
         memberMapper.insert(umsMember);
-        umsMember.setPassword(null);
+        umsMember.setPassword(null); //这里把密码设成 null，是为了清除当前 Java 对象中的密码信息，避免后续返回或使用对象时暴露密码哈希。
     }
 
     @Override

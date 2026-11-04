@@ -6,6 +6,7 @@ import com.macro.mall.dto.PmsProductCategoryParam;
 import com.macro.mall.dto.PmsProductCategoryWithChildrenItem;
 import com.macro.mall.model.PmsProductCategory;
 import com.macro.mall.service.PmsProductCategoryService;
+import com.macro.mall.validator.FlagValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,7 @@ import java.util.List;
  * Created by macro on 2018/4/26.
  */
 @Controller
+@Validated
 @Tag(name = "PmsProductCategoryController", description = "商品分类管理")
 @RequestMapping("/productCategory")
 public class PmsProductCategoryController {
@@ -85,7 +87,8 @@ public class PmsProductCategoryController {
     @Operation(summary = "修改导航栏显示状态")
     @RequestMapping(value = "/update/navStatus", method = RequestMethod.POST)
     @ResponseBody
-    public CommonResult updateNavStatus(@RequestParam("ids") List<Long> ids, @RequestParam("navStatus") Integer navStatus) {
+    public CommonResult updateNavStatus(@RequestParam("ids") List<Long> ids,
+                                        @FlagValidator(value = {"0", "1"}, message = "状态只能为0或1") @RequestParam("navStatus") Integer navStatus) {
         int count = productCategoryService.updateNavStatus(ids, navStatus);
         if (count > 0) {
             return CommonResult.success(count);
@@ -97,7 +100,8 @@ public class PmsProductCategoryController {
     @Operation(summary = "修改显示状态")
     @RequestMapping(value = "/update/showStatus", method = RequestMethod.POST)
     @ResponseBody
-    public CommonResult updateShowStatus(@RequestParam("ids") List<Long> ids, @RequestParam("showStatus") Integer showStatus) {
+    public CommonResult updateShowStatus(@RequestParam("ids") List<Long> ids,
+                                        @FlagValidator(value = {"0", "1"}, message = "状态只能为0或1") @RequestParam("showStatus") Integer showStatus) {
         int count = productCategoryService.updateShowStatus(ids, showStatus);
         if (count > 0) {
             return CommonResult.success(count);

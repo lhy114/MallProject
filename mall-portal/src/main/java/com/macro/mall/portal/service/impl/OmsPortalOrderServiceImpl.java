@@ -652,7 +652,8 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
         BigDecimal totalAmount = calcTotalAmount(orderItemList);
         for (OmsOrderItem orderItem : orderItemList) {
             //(商品价格/可用商品总价)*优惠券面额
-            BigDecimal couponAmount = orderItem.getProductPrice().divide(totalAmount, 3, RoundingMode.HALF_EVEN).multiply(coupon.getAmount());
+            BigDecimal couponAmount = orderItem.getProductPrice().divide(
+                totalAmount, 3, RoundingMode.HALF_EVEN).multiply(coupon.getAmount());
             orderItem.setCouponAmount(couponAmount);
         }
     }
@@ -716,7 +717,9 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
     private BigDecimal calcTotalAmount(List<OmsOrderItem> orderItemList) {
         BigDecimal totalAmount = new BigDecimal("0");
         for (OmsOrderItem item : orderItemList) {
-            totalAmount = totalAmount.add(item.getProductPrice().multiply(new BigDecimal(item.getProductQuantity())));
+            totalAmount = totalAmount.add(
+                item.getProductPrice().multiply(
+                    new BigDecimal(item.getProductQuantity())));
         }
         return totalAmount;
     }

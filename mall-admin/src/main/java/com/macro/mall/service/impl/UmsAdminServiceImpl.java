@@ -2,9 +2,11 @@ package com.macro.mall.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.github.pagehelper.PageHelper;
 import com.macro.mall.bo.AdminUserDetails;
+import com.macro.mall.common.api.BusinessErrorCode;
 import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.common.util.RequestUtil;
 import com.macro.mall.dao.UmsAdminPlusMapper;
@@ -13,6 +15,7 @@ import com.macro.mall.dto.UmsAdminParam;
 import com.macro.mall.dto.UpdateAdminPasswordParam;
 import com.macro.mall.mapper.UmsAdminLoginLogMapper;
 import com.macro.mall.mapper.UmsAdminMapper;
+import com.macro.mall.mapper.UmsAdminPermissionRelationMapper;
 import com.macro.mall.mapper.UmsAdminRoleRelationMapper;
 import com.macro.mall.model.*;
 import com.macro.mall.security.util.JwtTokenUtil;
@@ -31,6 +34,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -39,6 +43,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 后台用户管理Service实现类
@@ -62,19 +67,23 @@ public class UmsAdminServiceImpl implements UmsAdminService {
     private UmsAdminLoginLogMapper loginLogMapper;
     @Autowired
     private UmsAdminPlusMapper umsAdminPlusMapper;
+    @Autowired
+    private UmsAdminPermissionRelationMapper adminPermissionRelationMapper;
 
 
     @Override
     public UmsAdmin getAdminByUsername(String username) {
         //先从缓存中获取数据
-        UmsAdmin admin = getCacheService().getAdmin(username);
+        UmsAdmin admin = getCacheService().getAdmin(username); // 这里是通过redis进行缓存的
         if (admin != null) return admin;
         //缓存中没有从数据库中获取
-        UmsAdminExample example = new UmsAdminExample();
-        example.createCriteria().andUsernameEqualTo(username);
-        List<UmsAdmin> adminList = adminMapper.selectByExample(example);
-        if (adminList != null && adminList.size() > 0) {
-            admin = adminList.get(0);
+//        UmsAdminExample example = new UmsAdminExample();
+//        example.createCriteria().andUsernameEqualTo(username);
+//        List<UmsAdmin> adminList = adminMapper.selectByExample(example);
+        UmsAdmin selectAdmin = umsAdminPlusMapper.selectOne(Wrappers.lambdaQuery(UmsAdmin.class)
+            .eq(UmsAdmin::getUsername, username));
+        if (selectAdmin != null) {
+            admin = selectAdmin;
             //将数据库中的数据存入缓存中
             getCacheService().setAdmin(admin);
             return admin;
@@ -116,17 +125,25 @@ public class UmsAdminServiceImpl implements UmsAdminService {
     @Override
     public String login(String username, String password) {
         String token = null;
-        //密码需要客户端加密后传递
+        //密码需要客户端加密后传递， 前端这里应该也不是明文传递的吧
         try {
+            // 注意这里的UserDetails不仅仅只有用户的信息，还包括它能够访问的资源，它实现的是一个UserDetails的接口
             UserDetails userDetails = loadUserByUsername(username);
-            if(!passwordEncoder.matches(password,userDetails.getPassword())){
+            if(!passwordEncoder.matches(password, userDetails.getPassword())){
                 Asserts.fail("密码不正确");
             }
             if(!userDetails.isEnabled()){
                 Asserts.fail("帐号已被禁用");
             }
+
+
+            // 这里可以省略将认证结果保存在安全上下文中，因为本身访问就是无状态的，访问其他url你也拿不到login此次访问的上下文（可能吧，就要看后面的业务问题）
+            // spring security的认证结果对象
             UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+
+            //把认证结果放入当前线程的安全上下文中， 后续业务如果要获得当前用户的信息就可一个通过这个来进行获得
             SecurityContextHolder.getContext().setAuthentication(authentication);
+
             token = jwtTokenUtil.generateToken(userDetails);
 //            updateLoginTimeByUsername(username);
             insertLoginLog(username);
@@ -170,20 +187,45 @@ public class UmsAdminServiceImpl implements UmsAdminService {
 
     @Override
     public UmsAdmin getItem(Long id) {
-        return adminMapper.selectByPrimaryKey(id);
+        UmsAdmin admin = adminMapper.selectByPrimaryKey(id);
+        if (admin == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return admin;
     }
 
     @Override
     public List<UmsAdmin> list(String keyword, Integer pageSize, Integer pageNum) {
+
+        // 他是PageInterceptor拦截当前请求查询，然后执行limit操作的， 主要在这里他会创建一个线程
+        // 这个线程就会存储需要分页的信息
         PageHelper.startPage(pageNum, pageSize);
-        UmsAdminExample example = new UmsAdminExample();
-        UmsAdminExample.Criteria criteria = example.createCriteria();
-        if (!StrUtil.isEmpty(keyword)) {
-            criteria.andUsernameLike("%" + keyword + "%");
-            example.or(example.createCriteria().andNickNameLike("%" + keyword + "%"));
+
+        LambdaQueryWrapper<UmsAdmin> wrapper = Wrappers.lambdaQuery(UmsAdmin.class);
+
+        if(!StrUtil.isEmpty(keyword)){
+            wrapper.and(w -> w
+                .like(UmsAdmin::getUsername,keyword)
+                .or()
+                .like(UmsAdmin::getNickName,keyword));
         }
-        return adminMapper.selectByExample(example);
+
+        return umsAdminPlusMapper.selectList(wrapper);
     }
+
+//    @Override
+//    public List<UmsAdmin> list(String keyword, Integer pageSize, Integer pageNum) {
+//        PageHelper.startPage(pageNum, pageSize);
+//        UmsAdminExample example = new UmsAdminExample();
+//        UmsAdminExample.Criteria criteria = example.createCriteria();
+//        if (!StrUtil.isEmpty(keyword)) {
+//            criteria.andUsernameLike("%" + keyword + "%");
+//            example.or(example.createCriteria().andNickNameLike("%" + keyword + "%"));
+//        }
+//        return adminMapper.selectByExample(example);
+//    }
+
+
 
     @Override
     public int update(Long id, UmsAdmin admin) {
@@ -206,10 +248,37 @@ public class UmsAdminServiceImpl implements UmsAdminService {
     }
 
     @Override
+    @Transactional
     public int delete(Long id) {
+//        int count = adminMapper.deleteByPrimaryKey(id);
+//        getCacheService().delAdmin(id);
+//        getCacheService().delResourceList(id);
+        // 源代码有很多逻辑错误，这里根据我的思考进行删除
+//         1. 查询用户的信息，并判断是否存在
+        UmsAdmin admin = adminMapper.selectByPrimaryKey(id);
+        if(admin == null){
+            //1.1 不存在这个用户，count = 0；
+            return 0;
+        }
+
+        // 2. 删除管理员和角色的关系
+        UmsAdminRoleRelationExample roleRelationExample = new UmsAdminRoleRelationExample();
+        roleRelationExample.createCriteria().andAdminIdEqualTo(id);
+        adminRoleRelationMapper.deleteByExample(roleRelationExample);
+
+        // 3. 删除那些直接权限关系表
+        UmsAdminPermissionRelationExample permissionRelationExample = new UmsAdminPermissionRelationExample();
+        permissionRelationExample.createCriteria().andAdminIdEqualTo(id);
+        adminPermissionRelationMapper.deleteByExample(permissionRelationExample);
+
+        // 4. 删除管理员主表
         int count = adminMapper.deleteByPrimaryKey(id);
-        getCacheService().delAdmin(id);
+
+        // 5. 删除缓存
+        // 5.1 删除redis中的资源权限缓存
         getCacheService().delResourceList(id);
+        // 5.2 删除redis中的用户缓存
+        getCacheService().delAdminByUsername(admin.getUsername());
         return count;
     }
 
@@ -281,9 +350,10 @@ public class UmsAdminServiceImpl implements UmsAdminService {
 
     @Override
     public UserDetails loadUserByUsername(String username){
-        //获取用户信息
+        //获取用户信息，你是谁的问题解决了
         UmsAdmin admin = getAdminByUsername(username);
         if (admin != null) {
+            // 这里主要解决，你能够访问哪些接口的问题
             List<UmsResource> resourceList = getResourceList(admin.getId());
             return new AdminUserDetails(admin,resourceList);
         }
@@ -302,4 +372,5 @@ public class UmsAdminServiceImpl implements UmsAdminService {
         getCacheService().delAdmin(admin.getId());
         getCacheService().delResourceList(admin.getId());
     }
+
 }

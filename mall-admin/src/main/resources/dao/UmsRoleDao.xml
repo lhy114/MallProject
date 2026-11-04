@@ -20,6 +20,7 @@
                 LEFT JOIN ums_menu m ON rmr.menu_id = m.id
         WHERE
             arr.admin_id = #{adminId}
+          AND r.status = 1
           AND m.id IS NOT NULL
         GROUP BY
             m.id

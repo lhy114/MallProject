@@ -34,6 +34,7 @@ public class MallSecurityConfig {
 
     @Bean
     public DynamicSecurityService dynamicSecurityService() {
+        // 获取当前用户的资源并传入到map里面
         return new DynamicSecurityService() {
             @Override
             public Map<String, ConfigAttribute> loadDataSource() {

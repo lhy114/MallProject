@@ -1,6 +1,13 @@
 package com.macro.mall.service.impl;
 
+import com.baomidou.mybatisplus.core.toolkit.CollectionUtils;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.github.pagehelper.PageHelper;
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
+import com.macro.mall.dao.UmsMenuPlusMapper;
+import com.macro.mall.dao.UmsRoleMenuRelationPlusMapper;
+import com.macro.mall.dao.UmsRolePlusMapper;
 import com.macro.mall.dto.UmsMenuNode;
 import com.macro.mall.mapper.UmsMenuMapper;
 import com.macro.mall.model.*;
@@ -8,9 +15,11 @@ import com.macro.mall.service.UmsMenuService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -21,6 +30,10 @@ import java.util.stream.Collectors;
 public class UmsMenuServiceImpl implements UmsMenuService {
     @Autowired
     private UmsMenuMapper menuMapper;
+    @Autowired
+    private UmsRoleMenuRelationPlusMapper umsRoleMenuRelationPlusMapper;
+    @Autowired
+    private UmsMenuPlusMapper umsMenuPlusMapper;
 
     @Override
     public int create(UmsMenu umsMenu) {
@@ -56,13 +69,47 @@ public class UmsMenuServiceImpl implements UmsMenuService {
 
     @Override
     public UmsMenu getItem(Long id) {
-        return menuMapper.selectByPrimaryKey(id);
+        UmsMenu menu = menuMapper.selectByPrimaryKey(id);
+        if (menu == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return menu;
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int delete(Long id) {
+//        return menuMapper.deleteByPrimaryKey(id);
+
+        if (id == null) {
+            Asserts.fail("菜单ID不能为空");
+        }
+
+        UmsMenu umsMenu = menuMapper.selectByPrimaryKey(id);
+        if (umsMenu == null){
+            Asserts.fail("菜单不存在");
+        }
+        //1. 检查当前菜单是否有Role和子菜单进行引用
+        //1.1 如果有子菜单引用，抛出api异常，并告诉前端，不能删除该菜单
+        Long childCount = umsMenuPlusMapper.selectCount(Wrappers.<UmsMenu>lambdaQuery()
+            .eq(UmsMenu::getParentId, id));
+        if (childCount!=null && childCount > 0 ){
+            Asserts.fail("必须要将所有角色的菜单迁移之后才能进行");
+        }
+
+
+        //1.2 如果有Role引用，抛出api异常，并告诉前端，必须要将所有角色的菜单迁移之后才能进行
+        Long roleCount = umsRoleMenuRelationPlusMapper.selectCount(Wrappers.<UmsRoleMenuRelation>lambdaQuery()
+            .eq(UmsRoleMenuRelation::getMenuId, id));
+
+        if (roleCount!=null && roleCount>0) {
+            Asserts.fail("必须要将所有角色的菜单迁移之后才能进行");
+        }
+
+        //2. 如果没有引用，删除对应的role表
         return menuMapper.deleteByPrimaryKey(id);
     }
+
 
     @Override
     public List<UmsMenu> list(Long parentId, Integer pageSize, Integer pageNum) {

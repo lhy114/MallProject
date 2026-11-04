@@ -1,6 +1,7 @@
 package com.macro.mall.model;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.NotEmpty;
 import java.io.Serializable;
 import java.math.BigDecimal;
 import java.util.Date;
@@ -16,11 +17,13 @@ public class PmsProduct implements Serializable {
 
     private Long productAttributeCategoryId;
 
+    @NotEmpty(message = "商品名称不能为空")
     private String name;
 
     private String pic;
 
     @Schema(title = "货号")
+    @NotEmpty(message = "商品货号不能为空")
     private String productSn;
 
     @Schema(title = "删除状态：0->未删除；1->已删除")

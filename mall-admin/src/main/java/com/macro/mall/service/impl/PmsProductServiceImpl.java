@@ -3,6 +3,8 @@ package com.macro.mall.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.github.pagehelper.PageHelper;
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.dao.*;
 import com.macro.mall.dto.PmsProductParam;
 import com.macro.mall.dto.PmsProductQueryParam;
@@ -18,9 +20,9 @@ import org.springframework.util.CollectionUtils;
 
 import java.lang.reflect.Method;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -71,9 +73,14 @@ public class PmsProductServiceImpl implements PmsProductService {
         //创建商品
         PmsProduct product = productParam;
         product.setId(null);
-        productMapper.insertSelective(product);
+        if (productMapper.insertSelective(product) == 0) {
+            Asserts.fail("商品创建失败");
+        }
         //根据促销类型设置价格：会员价格、阶梯价格、满减价格
         Long productId = product.getId();
+        if (productId == null) {
+            Asserts.fail("商品创建失败：未获取到自增主键");
+        }
         //会员价格
         relateAndInsertList(memberPriceDao, productParam.getMemberPriceList(), productId);
         //阶梯价格
@@ -114,7 +121,11 @@ public class PmsProductServiceImpl implements PmsProductService {
 
     @Override
     public PmsProductResult getUpdateInfo(Long id) {
-        return productDao.getUpdateInfo(id);
+        PmsProductResult productResult = productDao.getUpdateInfo(id);
+        if (productResult == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return productResult;
     }
 
     @Override
@@ -123,7 +134,9 @@ public class PmsProductServiceImpl implements PmsProductService {
         //更新商品信息
         PmsProduct product = productParam;
         product.setId(id);
-        productMapper.updateByPrimaryKeySelective(product);
+        if (productMapper.updateByPrimaryKeySelective(product) == 0) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
         //会员价格
         PmsMemberPriceExample pmsMemberPriceExample = new PmsMemberPriceExample();
         pmsMemberPriceExample.createCriteria().andProductIdEqualTo(id);
@@ -231,25 +244,45 @@ public class PmsProductServiceImpl implements PmsProductService {
     }
 
     @Override
-    public int updateVerifyStatus(List<Long> ids, Integer verifyStatus, String detail) {
+    public int updateVerifyStatus(List<Long> ids, Integer verifyStatus, String detail, String vertifyMan) {
+        if (ids == null || ids.isEmpty()) {
+            Asserts.fail("请至少选择一个商品");
+        }
+        //去重，避免重复的商品id产生重复的审核记录，也让影响行数可以准确比对
+        List<Long> productIds = ids.stream().distinct().collect(Collectors.toList());
+
+        //先批量更新商品的审核状态
         PmsProduct product = new PmsProduct();
         product.setVerifyStatus(verifyStatus);
         PmsProductExample example = new PmsProductExample();
-        example.createCriteria().andIdIn(ids);
-        List<PmsProductVertifyRecord> list = new ArrayList<>();
+        example.createCriteria().andIdIn(productIds);
         int count = productMapper.updateByExampleSelective(product, example);
-        //修改完审核状态后插入审核记录
-        for (Long id : ids) {
+
+        //影响行数与请求的商品数不一致，说明有商品不存在，整体拒绝，避免给不存在的商品写审核记录
+        if (count != productIds.size()) {
+            Asserts.fail("部分商品不存在，请刷新后重试");
+        }
+
+        //再为这批商品补写审核记录
+        saveVerifyRecords(productIds, verifyStatus, detail, vertifyMan);
+        return count;
+    }
+
+    /**
+     * 为这批商品补写审核记录
+     */
+    private void saveVerifyRecords(List<Long> ids, Integer verifyStatus, String detail, String vertifyMan) {
+        Date createTime = new Date();
+        List<PmsProductVertifyRecord> records = ids.stream().map(id -> {
             PmsProductVertifyRecord record = new PmsProductVertifyRecord();
             record.setProductId(id);
-            record.setCreateTime(new Date());
+            record.setCreateTime(createTime);
             record.setDetail(detail);
             record.setStatus(verifyStatus);
-            record.setVertifyMan("test");
-            list.add(record);
-        }
-        productVertifyRecordDao.insertList(list);
-        return count;
+            record.setVertifyMan(vertifyMan);
+            return record;
+        }).collect(Collectors.toList());
+        productVertifyRecordDao.insertList(records);
     }
 
     @Override
@@ -317,10 +350,13 @@ public class PmsProductServiceImpl implements PmsProductService {
                 setProductId.invoke(item, productId);
             }
             Method insertList = dao.getClass().getMethod("insertList", List.class);
-            insertList.invoke(dao, dataList);
+            Object affectedRows = insertList.invoke(dao, dataList);
+            if (!(affectedRows instanceof Number) || ((Number) affectedRows).intValue() != dataList.size()) {
+                throw new IllegalStateException("批量插入行数与预期不符，预期 " + dataList.size() + " 行");
+            }
         } catch (Exception e) {
             LOGGER.warn("创建产品出错:{}", e.getMessage());
-            throw new RuntimeException(e.getMessage());
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 

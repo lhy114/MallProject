@@ -1,6 +1,8 @@
 package com.macro.mall.service.impl;
 
 import com.github.pagehelper.PageHelper;
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.dao.PmsProductCategoryAttributeRelationDao;
 import com.macro.mall.dao.PmsProductCategoryDao;
 import com.macro.mall.dto.PmsProductCategoryParam;
@@ -14,9 +16,11 @@ import cn.hutool.core.collection.CollUtil;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 商品分类管理Service实现类
@@ -102,13 +106,41 @@ public class PmsProductCategoryServiceImpl implements PmsProductCategoryService 
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int delete(Long id) {
+        //有子分类时禁止删除，否则子分类的parent_id会指向一个不存在的分类
+        PmsProductCategoryExample childExample = new PmsProductCategoryExample();
+        childExample.createCriteria().andParentIdEqualTo(id);
+        long childCount = productCategoryMapper.countByExample(childExample);
+        if (childCount > 0) {
+            Asserts.fail("该分类下还有" + childCount + "个子分类，无法删除");
+        }
+
+        //有商品在使用该分类时禁止删除
+        //只统计未删除的商品：商品列表硬编码了delete_status=0，已删除的商品后台根本看不到，
+        //若把它们也算进来，这个分类会因为一批看不见的商品而永远删不掉
+        PmsProductExample productExample = new PmsProductExample();
+        productExample.createCriteria().andProductCategoryIdEqualTo(id).andDeleteStatusEqualTo(0);
+        long productCount = productMapper.countByExample(productExample);
+        if (productCount > 0) {
+            Asserts.fail("该分类下还有" + productCount + "个商品，无法删除");
+        }
+
+        //分类自己的筛选属性关联跟着一起清理，否则会留下孤儿数据
+        PmsProductCategoryAttributeRelationExample relationExample = new PmsProductCategoryAttributeRelationExample();
+        relationExample.createCriteria().andProductCategoryIdEqualTo(id);
+        productCategoryAttributeRelationMapper.deleteByExample(relationExample);
+
         return productCategoryMapper.deleteByPrimaryKey(id);
     }
 
     @Override
     public PmsProductCategory getItem(Long id) {
-        return productCategoryMapper.selectByPrimaryKey(id);
+        PmsProductCategory productCategory = productCategoryMapper.selectByPrimaryKey(id);
+        if (productCategory == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return productCategory;
     }
 
     @Override

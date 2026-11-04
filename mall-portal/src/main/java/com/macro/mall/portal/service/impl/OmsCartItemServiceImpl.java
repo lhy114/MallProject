@@ -1,6 +1,8 @@
 package com.macro.mall.portal.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.mapper.OmsCartItemMapper;
 import com.macro.mall.model.OmsCartItem;
 import com.macro.mall.model.OmsCartItemExample;
@@ -18,6 +20,7 @@ import org.springframework.util.CollectionUtils;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -38,10 +41,13 @@ public class OmsCartItemServiceImpl implements OmsCartItemService {
     @Override
     public int add(OmsCartItem cartItem) {
         int count;
+        // 获得当前用户
         UmsMember currentMember =memberService.getCurrentMember();
         cartItem.setMemberId(currentMember.getId());
         cartItem.setMemberNickname(currentMember.getNickname());
         cartItem.setDeleteStatus(0);
+
+        // 判断购物车里面是否已经存在当前商品，如果不存在则插入到购物车里面，如果存在则更新商品数量
         OmsCartItem existCartItem = getCartItem(cartItem);
         if (existCartItem == null) {
             cartItem.setCreateDate(new Date());
@@ -112,7 +118,11 @@ public class OmsCartItemServiceImpl implements OmsCartItemService {
 
     @Override
     public CartProduct getCartProduct(Long productId) {
-        return productDao.getCartProduct(productId);
+        CartProduct cartProduct = productDao.getCartProduct(productId);
+        if (cartProduct == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", productId));
+        }
+        return cartProduct;
     }
 
     @Override

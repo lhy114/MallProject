@@ -2,6 +2,8 @@ package com.macro.mall.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.github.pagehelper.PageHelper;
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.dao.SmsCouponDao;
 import com.macro.mall.dao.SmsCouponProductCategoryRelationDao;
 import com.macro.mall.dao.SmsCouponProductRelationDao;
@@ -13,8 +15,10 @@ import com.macro.mall.model.*;
 import com.macro.mall.service.SmsCouponService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 优惠券管理Service实现类
@@ -34,6 +38,8 @@ public class SmsCouponServiceImpl implements SmsCouponService {
     private SmsCouponProductCategoryRelationDao productCategoryRelationDao;
     @Autowired
     private SmsCouponDao couponDao;
+
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public int create(SmsCouponParam couponParam) {
         couponParam.setCount(couponParam.getPublishCount());
@@ -58,6 +64,7 @@ public class SmsCouponServiceImpl implements SmsCouponService {
         return count;
     }
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public int delete(Long id) {
         //删除优惠券
@@ -120,6 +127,10 @@ public class SmsCouponServiceImpl implements SmsCouponService {
 
     @Override
     public SmsCouponParam getItem(Long id) {
-        return couponDao.getItem(id);
+        SmsCouponParam couponParam = couponDao.getItem(id);
+        if (couponParam == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return couponParam;
     }
 }

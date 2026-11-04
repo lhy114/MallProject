@@ -13,6 +13,7 @@ import com.macro.mall.service.UmsRoleService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
@@ -30,9 +31,11 @@ import java.util.stream.Collectors;
  * 后台用户管理Controller
  * Created by macro on 2018/4/26.
  */
+@Slf4j
 @Controller
 @Tag(name = "UmsAdminController", description = "后台用户管理")
 @RequestMapping("/admin")
+
 public class UmsAdminController {
     @Value("${jwt.tokenHeader}")
     private String tokenHeader;
@@ -73,6 +76,17 @@ public class UmsAdminController {
     @RequestMapping(value = "/refreshToken", method = RequestMethod.GET)
     @ResponseBody
     public CommonResult refreshToken(HttpServletRequest request) {
+        // 这个一般有前端的定时器进行完成
+        // 更常见的方式：前端请求拦截器（这个由前端进行完成，后端只进行token的颁布、刷新和撤销）
+        /*
+            1. 请求头不能为空
+            2. 去掉 Bearer 前缀
+            3. 校验 JWT 签名
+            4. 判断 JWT 是否过期
+            5. 判断是否在 30 分钟内刚刷新过
+            6. 未超过 30 分钟，直接返回原 Token
+            7. 超过 30 分钟，更新 created 并生成新 Token
+         */
         String token = request.getHeader(tokenHeader);
         String refreshToken = adminService.refreshToken(token);
         if (refreshToken == null) {
@@ -109,6 +123,31 @@ public class UmsAdminController {
     @RequestMapping(value = "/logout", method = RequestMethod.POST)
     @ResponseBody
     public CommonResult logout(Principal principal) {
+
+//        前端发送：
+//        POST /admin/logout
+//        Authorization: Bearer <JWT>
+//
+//        -> JwtAuthenticationTokenFilter
+//                    -> 读取 Authorization
+//                    -> 解析 JWT 得到 username
+//                    -> loadUserByUsername(username)
+//        -> 创建 Authentication
+//        -> 放入当前请求的 SecurityContext
+//
+//        -> Spring MVC 解析 Controller 参数 Principal
+//        -> Principal 实际来自 Authentication.principal
+//        -> principal.getName()
+//        -> AdminUserDetails.getUsername()
+//        -> 得到 username
+//
+//        -> adminService.logout(username)
+        if(principal == null || principal.getName() == null){
+            // 这里只是避免你的application路径没有把layout加进来，原作者代码中，对其进行了放行，由于我们的principal需要获得jwt才能成立，因此这里就会报错出现空指针异常
+            // 所以为了解决上述问题，我们将其从白名单里面进行剔除，同时在controller层再进行一次判断
+            log.info("没有登陆");
+            return CommonResult.unauthorized(null);
+        }
         adminService.logout(principal.getName());
         return CommonResult.success(null);
     }

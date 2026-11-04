@@ -11,7 +11,7 @@ spring:
     pathmatch:
       matching-strategy: ant_path_matcher
 
-mybatis:
+mybatis-plus:
   mapper-locations:
     - classpath:dao/*.xml
     - classpath*:com/**/mapper/*.xml
@@ -45,7 +45,7 @@ secure:
       - /admin/login
       - /admin/register
       - /admin/info
-      - /admin/logout
+#      - /admin/logout 这里我建议删除，如果请求没有jwt，那么你就拿不到对应的上下文信息，此时后面的logout就会出现空指针异常
       - /minio/upload
       - /aliyun/oss/policy
 

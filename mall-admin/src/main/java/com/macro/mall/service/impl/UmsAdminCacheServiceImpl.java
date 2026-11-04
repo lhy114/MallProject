@@ -112,4 +112,11 @@ public class UmsAdminCacheServiceImpl implements UmsAdminCacheService {
         String key = REDIS_DATABASE + ":" + REDIS_KEY_RESOURCE_LIST + ":" + adminId;
         redisService.set(key, resourceList, REDIS_EXPIRE);
     }
+
+
+    @Override
+    public void delAdminByUsername(String username) {
+        String key = REDIS_DATABASE + ":" + REDIS_KEY_ADMIN + ":" + username;
+        redisService.del(key);
+    }
 }

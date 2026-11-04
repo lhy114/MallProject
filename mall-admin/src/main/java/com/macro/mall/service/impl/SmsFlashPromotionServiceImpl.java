@@ -2,6 +2,8 @@ package com.macro.mall.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.github.pagehelper.PageHelper;
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.mapper.SmsFlashPromotionMapper;
 import com.macro.mall.model.SmsFlashPromotion;
 import com.macro.mall.model.SmsFlashPromotionExample;
@@ -11,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 限时购活动管理Service实现类
@@ -35,6 +38,7 @@ public class SmsFlashPromotionServiceImpl implements SmsFlashPromotionService {
 
     @Override
     public int delete(Long id) {
+        // 这里还是有问题，就是删除的时候，log你进行处理吗，同时这里的promotion_production关系你也不进行操作
         return flashPromotionMapper.deleteByPrimaryKey(id);
     }
 
@@ -48,7 +52,11 @@ public class SmsFlashPromotionServiceImpl implements SmsFlashPromotionService {
 
     @Override
     public SmsFlashPromotion getItem(Long id) {
-        return flashPromotionMapper.selectByPrimaryKey(id);
+        SmsFlashPromotion flashPromotion = flashPromotionMapper.selectByPrimaryKey(id);
+        if (flashPromotion == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return flashPromotion;
     }
 
     @Override

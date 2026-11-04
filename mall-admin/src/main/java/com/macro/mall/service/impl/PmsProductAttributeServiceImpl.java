@@ -1,6 +1,8 @@
 package com.macro.mall.service.impl;
 
 import com.github.pagehelper.PageHelper;
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.dao.PmsProductAttributeDao;
 import com.macro.mall.dto.PmsProductAttributeParam;
 import com.macro.mall.dto.ProductAttrInfo;
@@ -15,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 商品属性管理Service实现类
@@ -64,7 +67,11 @@ public class PmsProductAttributeServiceImpl implements PmsProductAttributeServic
 
     @Override
     public PmsProductAttribute getItem(Long id) {
-        return productAttributeMapper.selectByPrimaryKey(id);
+        PmsProductAttribute productAttribute = productAttributeMapper.selectByPrimaryKey(id);
+        if (productAttribute == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return productAttribute;
     }
 
     @Override

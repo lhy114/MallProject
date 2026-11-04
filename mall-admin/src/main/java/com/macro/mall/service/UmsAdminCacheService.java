@@ -54,4 +54,9 @@ public interface UmsAdminCacheService {
      * 设置缓存后台用户资源列表
      */
     void setResourceList(Long adminId, List<UmsResource> resourceList);
+
+    /**
+     * 按用户名删除后台缓存
+     */
+    void delAdminByUsername(String username);
 }

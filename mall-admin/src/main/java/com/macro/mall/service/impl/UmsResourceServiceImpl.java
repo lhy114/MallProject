@@ -2,6 +2,8 @@ package com.macro.mall.service.impl;
 
 import cn.hutool.core.util.StrUtil;
 import com.github.pagehelper.PageHelper;
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.mapper.UmsResourceMapper;
 import com.macro.mall.model.UmsResource;
 import com.macro.mall.model.UmsResourceExample;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 后台资源管理Service实现类
@@ -39,7 +42,11 @@ public class UmsResourceServiceImpl implements UmsResourceService {
 
     @Override
     public UmsResource getItem(Long id) {
-        return resourceMapper.selectByPrimaryKey(id);
+        UmsResource resource = resourceMapper.selectByPrimaryKey(id);
+        if (resource == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return resource;
     }
 
     @Override

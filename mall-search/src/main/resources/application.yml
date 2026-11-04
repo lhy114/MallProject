@@ -10,7 +10,7 @@ spring:
 server:
   port: 8081
 
-mybatis:
+mybatis-plus:
   mapper-locations:
     - classpath:dao/*.xml
     - classpath*:com/**/mapper/*.xml
@@ -31,6 +31,5 @@ springdoc:
   group-configs:
     - group: 'mall-search'
       packages-to-scan: com.macro.mall.search.controller
-
 
 

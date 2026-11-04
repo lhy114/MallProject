@@ -1,7 +1,9 @@
 package com.macro.mall.portal.service.impl;
 
 import com.github.pagehelper.PageHelper;
+import com.macro.mall.common.api.BusinessErrorCode;
 import com.macro.mall.common.api.CommonPage;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.mapper.PmsBrandMapper;
 import com.macro.mall.mapper.PmsProductMapper;
 import com.macro.mall.model.PmsBrand;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 前台品牌管理Service实现类
@@ -35,7 +38,11 @@ public class PmsPortalBrandServiceImpl implements PmsPortalBrandService {
 
     @Override
     public PmsBrand detail(Long brandId) {
-        return brandMapper.selectByPrimaryKey(brandId);
+        PmsBrand brand = brandMapper.selectByPrimaryKey(brandId);
+        if (brand == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", brandId));
+        }
+        return brand;
     }
 
     @Override

@@ -5,6 +5,7 @@ import com.macro.mall.common.api.CommonResult;
 import com.macro.mall.dto.PmsBrandParam;
 import com.macro.mall.model.PmsBrand;
 import com.macro.mall.service.PmsBrandService;
+import com.macro.mall.validator.FlagValidator;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,7 @@ import java.util.List;
  * Created by macro on 2018/4/26.
  */
 @Controller
+@Validated
 @Tag(name = "PmsBrandController", description = "商品品牌管理")
 @RequestMapping("/brand")
 public class PmsBrandController {
@@ -107,7 +109,7 @@ public class PmsBrandController {
     @RequestMapping(value = "/update/showStatus", method = RequestMethod.POST)
     @ResponseBody
     public CommonResult updateShowStatus(@RequestParam("ids") List<Long> ids,
-                                   @RequestParam("showStatus") Integer showStatus) {
+                                   @FlagValidator(value = {"0", "1"}, message = "显示状态只能为0或1") @RequestParam("showStatus") Integer showStatus) {
         int count = brandService.updateShowStatus(ids, showStatus);
         if (count > 0) {
             return CommonResult.success(count);
@@ -120,7 +122,7 @@ public class PmsBrandController {
     @RequestMapping(value = "/update/factoryStatus", method = RequestMethod.POST)
     @ResponseBody
     public CommonResult updateFactoryStatus(@RequestParam("ids") List<Long> ids,
-                                      @RequestParam("factoryStatus") Integer factoryStatus) {
+                                      @FlagValidator(value = {"0", "1"}, message = "厂家状态不正确") @RequestParam("factoryStatus") Integer factoryStatus) {
         int count = brandService.updateFactoryStatus(ids, factoryStatus);
         if (count > 0) {
             return CommonResult.success(count);

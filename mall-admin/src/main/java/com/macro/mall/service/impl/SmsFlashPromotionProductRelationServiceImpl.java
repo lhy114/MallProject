@@ -1,6 +1,8 @@
 package com.macro.mall.service.impl;
 
 import com.github.pagehelper.PageHelper;
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.dao.SmsFlashPromotionProductRelationDao;
 import com.macro.mall.dto.SmsFlashPromotionProduct;
 import com.macro.mall.mapper.SmsFlashPromotionProductRelationMapper;
@@ -11,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 限时购商品关联管理Service实现类
@@ -43,7 +46,11 @@ public class SmsFlashPromotionProductRelationServiceImpl implements SmsFlashProm
 
     @Override
     public SmsFlashPromotionProductRelation getItem(Long id) {
-        return relationMapper.selectByPrimaryKey(id);
+        SmsFlashPromotionProductRelation relation = relationMapper.selectByPrimaryKey(id);
+        if (relation == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return relation;
     }
 
     @Override

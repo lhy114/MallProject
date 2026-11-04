@@ -1,10 +1,14 @@
 package com.macro.mall.service.impl;
 
+import com.macro.mall.common.api.BusinessErrorCode;
+import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.mapper.OmsOrderSettingMapper;
 import com.macro.mall.model.OmsOrderSetting;
 import com.macro.mall.service.OmsOrderSettingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.Map;
 
 /**
  * 订单设置管理Service实现类
@@ -17,7 +21,11 @@ public class OmsOrderSettingServiceImpl implements OmsOrderSettingService {
 
     @Override
     public OmsOrderSetting getItem(Long id) {
-        return orderSettingMapper.selectByPrimaryKey(id);
+        OmsOrderSetting orderSetting = orderSettingMapper.selectByPrimaryKey(id);
+        if (orderSetting == null) {
+            Asserts.fail(BusinessErrorCode.NOT_FOUND, Map.of("field", "id", "value", id));
+        }
+        return orderSetting;
     }
 
     @Override

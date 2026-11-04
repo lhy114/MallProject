@@ -42,9 +42,10 @@ public interface PmsProductService {
      * @param ids 商品ID列表
      * @param verifyStatus 审核状态
      * @param detail 审核详情
+     * @param vertifyMan 审核人（当前登录用户）
      */
     @Transactional
-    int updateVerifyStatus(List<Long> ids, Integer verifyStatus, String detail);
+    int updateVerifyStatus(List<Long> ids, Integer verifyStatus, String detail, String vertifyMan);
 
     /**
      * 批量修改商品上架状态
