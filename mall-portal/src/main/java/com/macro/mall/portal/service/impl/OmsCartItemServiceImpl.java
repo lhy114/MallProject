@@ -38,11 +38,15 @@ public class OmsCartItemServiceImpl implements OmsCartItemService {
     @Autowired
     private UmsMemberService memberService;
 
+    @Autowired
+    private ProductSaleValidator productSaleValidator;
+
     @Override
     public int add(OmsCartItem cartItem) {
         int count;
         // 获得当前用户
         UmsMember currentMember =memberService.getCurrentMember();
+        productSaleValidator.validate(java.util.Collections.singletonList(cartItem));
         cartItem.setMemberId(currentMember.getId());
         cartItem.setMemberNickname(currentMember.getNickname());
         cartItem.setDeleteStatus(0);
