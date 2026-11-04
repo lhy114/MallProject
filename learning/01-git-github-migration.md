@@ -153,3 +153,17 @@ git ls-remote origin refs/heads/feature/mybatis-plus-pilot
 - 将已有业务修改保存为一次学习成果快照，再单独提交文档清理与协作规范。快照提交不代表业务功能已测试通过。
 - 本次仅迁移 Git 项目，不运行 Java 功能测试；Docker 部署目录在项目外，不包含在此次推送中。
 - 下一步：推送当前分支并核对远程 SHA；以末尾验证记录为准。
+
+### 首次推送结果：等待本机认证
+
+2026-11-04 已创建本地提交：
+- `005d797`：保存现有业务学习成果快照。
+- `71386c6`：整理文档与 GitHub 迁移指南。
+
+首次执行 `git push -u origin feature/mybatis-plus-pilot` 失败：
+`fatal: could not read Username for 'https://github.com': Device not configured`。
+这表示当前终端没有可用的 HTTPS 凭据，不是代码冲突。远程上传尚未完成。
+
+推荐用户在 IDEA 中使用 Git → Push，确认目标是自己的 origin 与当前分支；若要求认证，通过 IDEA 的 GitHub 登录流程在本机完成。不要把令牌发到聊天中。
+若 IDEA 需要添加账号，在 Settings → Version Control → GitHub 中添加自己的账号，然后重试 Push。界面名称可能随 IDEA 版本不同。
+推送完成后告知 Codex，由 Codex 重新检查远程 SHA 和分支跟踪关系，并补记最终结果。
