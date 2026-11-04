@@ -12,6 +12,9 @@ public interface UmsMemberCacheService {
      */
     void delMember(Long memberId);
 
+    /** Invalidates an already captured username without querying the database. */
+    void delMemberByUsername(String username);
+
     /**
      * 获取会员用户缓存
      */

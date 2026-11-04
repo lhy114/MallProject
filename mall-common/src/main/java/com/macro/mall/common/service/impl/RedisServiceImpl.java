@@ -14,6 +14,16 @@ import java.util.concurrent.TimeUnit;
  * Created by macro on 2020/3/3.
  */
 public class RedisServiceImpl implements RedisService {
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(RedisServiceImpl.class);
+
+    private void logDeleteFailure(Object keys, RuntimeException failure) {
+        try {
+            LOGGER.error("event=CACHE_INVALIDATION_FAILED scenario=redis.delete keys={} timestamp={} exception={}",
+                keys, java.time.Instant.now(), failure.getClass().getName(), failure);
+        } catch (Throwable loggingFailure) {
+            // Observability must not alter business outcomes.
+        }
+    }
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
@@ -34,12 +44,22 @@ public class RedisServiceImpl implements RedisService {
 
     @Override
     public Boolean del(String key) {
-        return redisTemplate.delete(key);
+        try {
+            return redisTemplate.delete(key);
+        } catch (RuntimeException failure) {
+            logDeleteFailure(key, failure);
+            throw failure;
+        }
     }
 
     @Override
     public Long del(List<String> keys) {
-        return redisTemplate.delete(keys);
+        try {
+            return redisTemplate.delete(keys);
+        } catch (RuntimeException failure) {
+            logDeleteFailure(keys, failure);
+            throw failure;
+        }
     }
 
     @Override

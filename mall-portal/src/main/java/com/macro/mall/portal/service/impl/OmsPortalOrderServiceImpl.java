@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import com.github.pagehelper.PageHelper;
 import com.macro.mall.common.api.CommonPage;
+import com.macro.mall.common.api.BusinessErrorCode;
 import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.common.service.RedisService;
 import com.macro.mall.mapper.*;
@@ -66,6 +67,11 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
     @Autowired
     private CancelOrderSender cancelOrderSender;
 
+    @Autowired
+    private ProductSaleValidator productSaleValidator;
+    @Autowired
+    private OmsPromotionService promotionService;
+
     @Override
     public ConfirmOrderResult generateConfirmOrder(List<Long> cartIds) {
         ConfirmOrderResult result = new ConfirmOrderResult();
@@ -99,7 +105,21 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
         }
         //获取购物车及优惠信息
         UmsMember currentMember = memberService.getCurrentMember();
-        List<CartPromotionItem> cartPromotionItemList = cartItemService.listPromotion(currentMember.getId(), orderParam.getCartIds());
+        //先检查本次实际提交的购物车，再对同一批数据计算促销；失效商品不能静默过滤。
+        List<OmsCartItem> cartItems = cartItemService.list(currentMember.getId());
+        if (CollUtil.isNotEmpty(orderParam.getCartIds())) {
+            Set<Long> selectedIds = new HashSet<>(orderParam.getCartIds());
+            cartItems = cartItems.stream().filter(item -> selectedIds.contains(item.getId()))
+                    .collect(Collectors.toList());
+            if (cartItems.size() != selectedIds.size()) {
+                Asserts.fail(BusinessErrorCode.DATA_CONFLICT, Map.of("reason", "部分购物车商品已失效，请刷新后重试"));
+            }
+        }
+        productSaleValidator.validate(cartItems);
+        List<CartPromotionItem> cartPromotionItemList = promotionService.calcCartPromotion(cartItems);
+        if (CollUtil.isEmpty(cartPromotionItemList) || cartPromotionItemList.size() != cartItems.size()) {
+            Asserts.fail(BusinessErrorCode.DATA_CONFLICT, Map.of("reason", "购物车商品信息已变化，请刷新后重试"));
+        }
         for (CartPromotionItem cartPromotionItem : cartPromotionItemList) {
             //生成下单商品信息
             OmsOrderItem orderItem = new OmsOrderItem();

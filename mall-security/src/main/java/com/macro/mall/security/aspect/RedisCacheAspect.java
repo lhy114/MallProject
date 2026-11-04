@@ -33,15 +33,22 @@ public class RedisCacheAspect {
         Signature signature = joinPoint.getSignature();
         MethodSignature methodSignature = (MethodSignature) signature;
         Method method = methodSignature.getMethod();
+        Method targetMethod = org.springframework.aop.support.AopUtils.getMostSpecificMethod(
+            method, joinPoint.getTarget().getClass());
         Object result = null;
         try {
             result = joinPoint.proceed();
         } catch (Throwable throwable) {
             //有CacheException注解的方法需要抛出异常
-            if (method.isAnnotationPresent(CacheException.class)) {
+            if ((method.isAnnotationPresent(CacheException.class)
+                || targetMethod.isAnnotationPresent(CacheException.class))) {
                 throw throwable;
             } else {
-                LOGGER.error(throwable.getMessage());
+                try {
+                    LOGGER.error("event=CACHE_OPERATION_FAILED scenario={}", targetMethod.toGenericString(), throwable);
+                } catch (Throwable loggingFailure) {
+                    // Cache degradation must survive logging failures.
+                }
             }
         }
         return result;

@@ -1,6 +1,7 @@
 package com.macro.mall.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import com.macro.mall.common.util.CacheInvalidation;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -271,14 +272,17 @@ public class UmsAdminServiceImpl implements UmsAdminService {
         permissionRelationExample.createCriteria().andAdminIdEqualTo(id);
         adminPermissionRelationMapper.deleteByExample(permissionRelationExample);
 
+        String username = admin.getUsername();
         // 4. 删除管理员主表
         int count = adminMapper.deleteByPrimaryKey(id);
 
         // 5. 删除缓存
         // 5.1 删除redis中的资源权限缓存
-        getCacheService().delResourceList(id);
-        // 5.2 删除redis中的用户缓存
-        getCacheService().delAdminByUsername(admin.getUsername());
+        CacheInvalidation.afterCommitOrNow("admin.delete.resources",
+            () -> getCacheService().delResourceList(id));
+        // Use the username captured before deleting the database record.
+        CacheInvalidation.afterCommitOrNow("admin.delete.user",
+            () -> getCacheService().delAdminByUsername(username));
         return count;
     }
 
@@ -300,7 +304,8 @@ public class UmsAdminServiceImpl implements UmsAdminService {
             }
             adminRoleRelationDao.insertList(list);
         }
-        getCacheService().delResourceList(adminId);
+        CacheInvalidation.afterCommitOrNow("admin.updateRole",
+            () -> getCacheService().delResourceList(adminId));
         return count;
     }
 

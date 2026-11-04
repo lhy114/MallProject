@@ -1,6 +1,7 @@
 package com.macro.mall.portal.service.impl;
 
 import cn.hutool.core.util.StrUtil;
+import com.macro.mall.common.util.CacheInvalidation;
 import com.macro.mall.common.exception.Asserts;
 import com.macro.mall.mapper.UmsMemberLevelMapper;
 import com.macro.mall.mapper.UmsMemberMapper;
@@ -130,9 +131,11 @@ public class UmsMemberServiceImpl implements UmsMemberService {
             Asserts.fail("验证码错误");
         }
         UmsMember umsMember = memberList.get(0);
+        String username = umsMember.getUsername();
         umsMember.setPassword(passwordEncoder.encode(password));
         memberMapper.updateByPrimaryKeySelective(umsMember);
-        memberCacheService.delMember(umsMember.getId());
+        CacheInvalidation.afterCommitOrNow("member.updatePassword",
+            () -> memberCacheService.delMemberByUsername(username));
     }
 
     @Override
@@ -145,11 +148,16 @@ public class UmsMemberServiceImpl implements UmsMemberService {
 
     @Override
     public void updateIntegration(Long id, Integer integration) {
+        UmsMember member = memberMapper.selectByPrimaryKey(id);
+        String username = member == null ? null : member.getUsername();
         UmsMember record=new UmsMember();
         record.setId(id);
         record.setIntegration(integration);
         memberMapper.updateByPrimaryKeySelective(record);
-        memberCacheService.delMember(id);
+        if (username != null) {
+            CacheInvalidation.afterCommitOrNow("member.updateIntegration",
+                () -> memberCacheService.delMemberByUsername(username));
+        }
     }
 
     @Override

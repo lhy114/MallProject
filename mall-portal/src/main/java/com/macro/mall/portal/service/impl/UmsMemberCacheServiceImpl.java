@@ -40,6 +40,11 @@ public class UmsMemberCacheServiceImpl implements UmsMemberCacheService {
     }
 
     @Override
+    public void delMemberByUsername(String username) {
+        redisService.del(REDIS_DATABASE + ":" + REDIS_KEY_MEMBER + ":" + username);
+    }
+
+    @Override
     public UmsMember getMember(String username) {
         String key = REDIS_DATABASE + ":" + REDIS_KEY_MEMBER + ":" + username;
         return (UmsMember) redisService.get(key);
