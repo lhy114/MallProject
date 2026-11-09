@@ -1,6 +1,7 @@
 package com.macro.mall.portal.dao;
 
 import com.macro.mall.model.OmsOrderItem;
+import com.macro.mall.model.OmsCartItem;
 import com.macro.mall.portal.domain.OmsOrderDetail;
 import org.apache.ibatis.annotations.Param;
 
@@ -11,6 +12,12 @@ import java.util.List;
  * Created by macro on 2018/9/4.
  */
 public interface PortalOrderDao {
+    /** 只锁本次消费的有效购物车行，锁生命周期与数据库事务一致。 */
+    List<OmsCartItem> lockCheckoutCartItems(@Param("memberId") Long memberId,
+                                          @Param("cartIds") List<Long> cartIds);
+
+    int reserveSkuStock(@Param("skuId") Long skuId, @Param("quantity") Integer quantity);
+
     /**
      * 获取订单及下单商品详情
      */

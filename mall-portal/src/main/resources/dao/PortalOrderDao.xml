@@ -1,6 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.macro.mall.portal.dao.PortalOrderDao">
+    <select id="lockCheckoutCartItems" resultMap="com.macro.mall.mapper.OmsCartItemMapper.BaseResultMap">
+        SELECT * FROM oms_cart_item FORCE INDEX (PRIMARY)
+        WHERE member_id = #{memberId} AND delete_status = 0
+        <choose>
+          <when test="cartIds != null and cartIds.size() > 0">
+            AND id IN
+            <foreach collection="cartIds" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+          </when>
+          <otherwise>AND 1 = 0</otherwise>
+        </choose>
+        ORDER BY id
+        FOR UPDATE
+    </select>
+    <update id="reserveSkuStock">
+        UPDATE pms_sku_stock
+        SET lock_stock = COALESCE(lock_stock, 0) + #{quantity}
+        WHERE id = #{skuId} AND #{quantity} > 0
+          AND stock - COALESCE(lock_stock, 0) &gt;= #{quantity}
+    </update>
     <resultMap id="orderDetailMap" type="com.macro.mall.portal.domain.OmsOrderDetail"
                extends="com.macro.mall.mapper.OmsOrderMapper.BaseResultMap">
         <collection property="orderItemList" columnPrefix="ot_"

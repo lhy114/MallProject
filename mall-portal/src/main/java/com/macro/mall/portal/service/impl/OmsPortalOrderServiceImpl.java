@@ -106,7 +106,15 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
         //获取购物车及优惠信息
         UmsMember currentMember = memberService.getCurrentMember();
         //先检查本次实际提交的购物车，再对同一批数据计算促销；失效商品不能静默过滤。
-        List<OmsCartItem> cartItems = cartItemService.list(currentMember.getId());
+        // 当前读并锁定本次消费的购物车行；InnoDB 在整个事务提交/回滚后释放锁。
+        List<Long> checkoutCartIds = orderParam.getCartIds();
+        if (CollUtil.isEmpty(checkoutCartIds)) {
+            // 保留未指定 cartIds 时结算当前购物车的语义，同时避免无主键范围的锁定扫描。
+            checkoutCartIds = cartItemService.list(currentMember.getId()).stream()
+                    .map(OmsCartItem::getId).collect(Collectors.toList());
+        }
+        List<OmsCartItem> cartItems = portalOrderDao.lockCheckoutCartItems(
+                currentMember.getId(), checkoutCartIds);
         if (CollUtil.isNotEmpty(orderParam.getCartIds())) {
             Set<Long> selectedIds = new HashSet<>(orderParam.getCartIds());
             cartItems = cartItems.stream().filter(item -> selectedIds.contains(item.getId()))
@@ -277,10 +285,14 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
         order.setStatus(1);
         order.setPaymentTime(new Date());
         order.setPayType(payType);
-        orderMapper.updateByPrimaryKeySelective(order);
+        OmsOrderExample pending = new OmsOrderExample();
+        pending.createCriteria().andIdEqualTo(orderId).andStatusEqualTo(0).andDeleteStatusEqualTo(0);
+        if (orderMapper.updateByExampleSelective(order, pending) == 0) {
+            return 0;
+        }
         //恢复所有下单商品的锁定库存，扣减真实库存
         OmsOrderDetail orderDetail = portalOrderDao.getDetail(orderId);
-        int count = portalOrderDao.updateSkuStock(orderDetail.getOrderItemList());
+        int count = portalOrderDao.updateSkuStock(aggregateStockItems(orderDetail.getOrderItemList()));
         return count;
     }
 
@@ -293,15 +305,17 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
         if (CollectionUtils.isEmpty(timeOutOrders)) {
             return count;
         }
-        //修改订单状态为交易取消
-        List<Long> ids = new ArrayList<>();
         for (OmsOrderDetail timeOutOrder : timeOutOrders) {
-            ids.add(timeOutOrder.getId());
-        }
-        portalOrderDao.updateOrderStatus(ids, 4);
-        for (OmsOrderDetail timeOutOrder : timeOutOrders) {
+            OmsOrder change = new OmsOrder();
+            change.setStatus(4);
+            OmsOrderExample pending = new OmsOrderExample();
+            pending.createCriteria().andIdEqualTo(timeOutOrder.getId()).andStatusEqualTo(0);
+            if (orderMapper.updateByExampleSelective(change, pending) == 0) {
+                continue;
+            }
+            count++;
             //解除订单商品库存锁定
-            portalOrderDao.releaseSkuStockLock(timeOutOrder.getOrderItemList());
+            portalOrderDao.releaseSkuStockLock(aggregateStockItems(timeOutOrder.getOrderItemList()));
             //修改优惠券使用状态
             updateCouponStatus(timeOutOrder.getCouponId(), timeOutOrder.getMemberId(), 0);
             //返还使用积分
@@ -310,7 +324,7 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
                 memberService.updateIntegration(timeOutOrder.getMemberId(), member.getIntegration() + timeOutOrder.getUseIntegration());
             }
         }
-        return timeOutOrders.size();
+        return count;
     }
 
     @Override
@@ -326,13 +340,17 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
         if (cancelOrder != null) {
             //修改订单状态为取消
             cancelOrder.setStatus(4);
-            orderMapper.updateByPrimaryKeySelective(cancelOrder);
+            OmsOrder change = new OmsOrder();
+            change.setStatus(4);
+            if (orderMapper.updateByExampleSelective(change, example) == 0) {
+                return;
+            }
             OmsOrderItemExample orderItemExample = new OmsOrderItemExample();
             orderItemExample.createCriteria().andOrderIdEqualTo(orderId);
             List<OmsOrderItem> orderItemList = orderItemMapper.selectByExample(orderItemExample);
             //解除订单商品库存锁定
             if (!CollectionUtils.isEmpty(orderItemList)) {
-                portalOrderDao.releaseSkuStockLock(orderItemList);
+                portalOrderDao.releaseSkuStockLock(aggregateStockItems(orderItemList));
             }
             //修改优惠券使用状态
             updateCouponStatus(cancelOrder.getCouponId(), cancelOrder.getMemberId(), 0);
@@ -748,11 +766,31 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
      * 锁定下单商品的所有库存
      */
     private void lockStock(List<CartPromotionItem> cartPromotionItemList) {
-        for (CartPromotionItem cartPromotionItem : cartPromotionItemList) {
-            PmsSkuStock skuStock = skuStockMapper.selectByPrimaryKey(cartPromotionItem.getProductSkuId());
-            skuStock.setLockStock(skuStock.getLockStock() + cartPromotionItem.getQuantity());
-            skuStockMapper.updateByPrimaryKeySelective(skuStock);
+        // 多 SKU 总是按主键顺序预占，降低反向购物车顺序导致的死锁概率。
+        List<CartPromotionItem> stockItems = new ArrayList<>(cartPromotionItemList);
+        stockItems.sort(Comparator.comparing(CartPromotionItem::getProductSkuId));
+        for (CartPromotionItem cartPromotionItem : stockItems) {
+            Integer quantity = cartPromotionItem.getQuantity();
+            if (quantity == null || quantity <= 0
+                    || portalOrderDao.reserveSkuStock(cartPromotionItem.getProductSkuId(), quantity) != 1) {
+                Asserts.fail("库存不足，无法下单");
+            }
         }
+    }
+
+    // CASE id 更新每个 SKU 只命中一次；同 SKU 多条订单明细必须合并数量。
+    private List<OmsOrderItem> aggregateStockItems(List<OmsOrderItem> items) {
+        Map<Long, OmsOrderItem> quantities = new TreeMap<>();
+        for (OmsOrderItem item : items) {
+            OmsOrderItem total = quantities.computeIfAbsent(item.getProductSkuId(), id -> {
+                OmsOrderItem value = new OmsOrderItem();
+                value.setProductSkuId(id);
+                value.setProductQuantity(0);
+                return value;
+            });
+            total.setProductQuantity(Math.addExact(total.getProductQuantity(), item.getProductQuantity()));
+        }
+        return new ArrayList<>(quantities.values());
     }
 
     /**
